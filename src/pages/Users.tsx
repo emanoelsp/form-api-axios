@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { getUsuarios, deleteUsuario, updateUsuario, type Usuario } from "../../api";
 
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { FaEdit, FaSave, FaTrash, FaTimes } from "react-icons/fa";
 import Swal from 'sweetalert2'
 
 function Users() {
@@ -10,15 +10,16 @@ function Users() {
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | number | null>(null)
   const [editedUser, setEditedUser] = useState<Usuario | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
 
-  const fetchUsuarios = async () => { 
-    try{
+  const fetchUsuarios = async () => {
+    try {
       setLoading(true)
       const data = await getUsuarios()
       setUsuarios(data)
-    }catch(error){
+    } catch (error) {
       console.log("Erro ao buscar os usuários", error)
-    }finally{
+    } finally {
       setLoading(false)
     }
   }
@@ -55,44 +56,126 @@ function Users() {
     setEditedUser({ ...usuario })
   }
 
+  const handleChanges = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!editedUser) return;
+    const { name, value } = e.target
+    setEditedUser(prev => ({
+      ...prev!,
+      [name]: value
+    }))
+  }
+
+  const handleSave = async () => {
+    if (!editedUser || !editingId) return;
+    try {
+      setIsUpdating(true)
+      await updateUsuario(editingId, editedUser)
+      setUsuarios(prev => prev.map(user => user.id === editingId ? editedUser : user))
+      setEditingId(null)
+      setEditedUser(null)
+    } catch (error) {
+      console.log("Erro ao atualizar o usuário", error)
+      Swal.fire("Erro!", "Não foi possível atualizar o usuário", "error")
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleCancel = () => {
+    setEditingId(null)
+    setEditedUser(null)
+  }
+
+  const renderInputField = (fieldName: keyof Usuario, value: string) => {
+    return (
+    <input
+      type="text"
+      name={fieldName}
+      value={value}
+      onChange={handleChanges}
+      className="p-2"
+    />
+    )
+  }
+
+  const renderActions = (usuario: Usuario) => {
+    if (editingId === usuario.id) {
+      return (
+        <>
+          <button onClick={handleSave} disabled={isUpdating}>
+            <FaSave />
+            <span>Salvar</span>
+          </button>
+          <button onClick={handleCancel}>
+            <FaTimes />
+            <span>Cancelar</span>
+          </button>
+        </>
+      )
+    } else {
+      return (
+        <>
+          <button onClick={() => handleEdit(usuario)}>
+            <FaEdit />
+            <span>Editar</span>
+          </button>
+          <button onClick={() => handleDelete(usuario.id)}>
+            <FaTrash className="text-red-500" />
+            <span>Excluir</span>
+          </button>
+        </>
+      )
+    }
+  }
+
+
   return (
     <div className="h-screen flex flex-col items-center justify-center bg-blue-900">
       <h1 className="text-2xl font-bold text-center text-gray-400">
         LISTA DE USUÁRIOS CADASTRADOS
       </h1>
       <hr className="w-full" />
-      {loading ?  (
+      {loading ? (
         <p className="text-white"> Carregando usuários ... </p>
       ) : usuarios.length === 0 ? (
-       <p className="text-white"> Nenhum usuário cadastratado </p>
+        <p className="text-white"> Nenhum usuário cadastratado </p>
       ) : (
-      <table className="w-full">
-        <thead className="bg-gray-400">
-          <tr>
-            <th className="border px-2 py-2 text-left"> Nome </th>
-            <th className="px-2 py-2 text-left"> Sobrenome </th>
-            <th className="px-2 py-2 text-left"> Email </th>
-            <th className="px-2 py-2 text-left"> CPF </th>
-            <th className="px-2 py-2 text-center"> Ação </th>
-          </tr>
-        </thead>
-        <tbody className="bg-gray-200">
-          {usuarios.map((usuario) => (
+        <table className="w-full">
+          <thead className="bg-gray-400">
             <tr>
-              <td className="px-2"> {usuario.nome} </td>
-              <td className="px-2"> {usuario.sobrenome} </td>
-              <td className="px-2"> {usuario.email}  </td>
-              <td className="px-2"> {usuario.sobrenome} </td>
-              <td className="px-2 text-center flex justify-center gap-3">
-                <FaEdit />
-                <button onClick={() => handleDelete(usuario.id)}>
-                  <FaTrash className="text-red-500" />
-                </button>
-              </td>
+              <th className="border px-2 py-2 text-left"> Nome </th>
+              <th className="px-2 py-2 text-left"> Sobrenome </th>
+              <th className="px-2 py-2 text-left"> Email </th>
+              <th className="px-2 py-2 text-left"> CPF </th>
+              <th className="px-2 py-2 text-center"> Ação </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="bg-gray-200">
+            {usuarios.map((usuario) => (
+              <tr>
+                <td className="px-2">
+                  {editingId === usuario.id ?
+                    renderInputField("nome", editedUser?.nome || "") : usuario.nome}
+                </td>
+                <td className="px-2">
+                  {editingId === usuario.id ?
+                    renderInputField("sobrenome", editedUser?.sobrenome || "") : usuario.sobrenome}
+                </td>
+                <td className="px-2">
+                  {editingId === usuario.id ?
+                    renderInputField("email", editedUser?.email || "") : usuario.email}
+                </td>
+                <td className="px-2">
+                  {editingId === usuario.id ?
+                    renderInputField("cpf", editedUser?.cpf || "") : usuario.cpf}
+                </td>
+                <td className="px-2 text-center flex justify-center gap-3">
+                  {renderActions(usuario)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );
